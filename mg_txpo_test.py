@@ -71,34 +71,34 @@ class PMThread(threading.Thread):
 
 
 def tx_measure(dev, power_meter, packet_count):
-    rx_thread = SummitDeviceThread(dev, packet_count)
+    sdev_thread = SummitDeviceThread(dev, packet_count)
     pm_thread = PMThread(power_meter)
 
     pm_thread.start()
-    rx_thread.start()
+    sdev_thread.start()
     pm_thread.join()
     return pm_thread.measurements
 
 def main(TX, RX, iterations, test_profile, power_controller):
-# Instantiate a Power Meter and give it an open COM port
+    # Instantiate a Power Meter and give it an open COM port
     COM = rfmeter.comport.ComPort('/dev/ttyUSB0')
     COM.connect()
     PM = E4418B(COM)
 
 ### Beginning of Dave Schilling's new PM code ###
 
-# File operations to load in the power meter offset
+    # File operations to load in the power meter offset
     pm_offset_file = open('pm_offset.dat', 'r')
     pm_offset = float(pm_offset_file.read(6))
     pm_offset_file.close()
 
-# Uncomment the duty factor setting appropriate to your test
-#    duty_factor = 0.23 # 36mbit
+    # Uncomment the duty factor setting appropriate to your test
+    #duty_factor = 0.23 # 36mbit
     duty_factor = 0.34 # 18mbit
-#    duty_factor = 0.55 # 6mbit
-#    duty_factor = 0.75 # ISOC
+    #duty_factor = 0.55 # 6mbit
+    #duty_factor = 0.75 # ISOC
 
-# Set up Power Meter as we like it
+    # Set up Power Meter as we like it
     print ("========================================================")
     print ("Power Meter ============================================")
 
@@ -140,7 +140,7 @@ def main(TX, RX, iterations, test_profile, power_controller):
 
 ### End of Dave Schilling's new PM code ###
 
-# Read the settings of the TX (Master) device
+    # Read the settings of the TX (Master) device
     TX.wr(0x406004, 0x00) # IRQ enable reg
     TX.wr(0x408840, 0x00) # CCA level reg
     TX.wr(0x401004, 0x07) # 18Mb/s
@@ -160,14 +160,6 @@ def main(TX, RX, iterations, test_profile, power_controller):
         print dec.decode_error_status(status)
     print "  DataRate regr 401004: 0x%X" % DataRate
 
-#    TX.wr(0x401004, 0x0007)
-#
-#    (status, DataRate) = TX.rd(0x401004)
-#    if(status != 0x01):
-#        print dec.decode_error_status(status)
-#    print "  DataRate regr 401004: 0x%X" % DataRate
-
-
     gc_addrs = [0x4089A0,
                 0x4089A4,
                 0x4089A8,
@@ -177,24 +169,23 @@ def main(TX, RX, iterations, test_profile, power_controller):
                 0x4089B8,
                 0x4089BC]
 
-
     filename = 'txpo_%s.txt' % (TX['mac'].replace(':','-'))
 
-# Ensure enabling power compensation
+    # Ensure enabling power compensation
     (status, null) = TX.set_power_comp_enable(1)
 
     with open(filename, 'w') as f:
-        out_str = "datetime, MAC, channel, temp, txgc, txpo"
+        out_str = "datetime, MAC, channel, temp, txgc, txpo, pdout"
         print out_str
         f.write("%s\n" % out_str)
 
         for ch in range(8,35):
             TX.set_radio_channel(0, ch)
 
-    # Get the temperature
+            # Get the temperature
             (status, temp) = TX.temperature()
 
-    # Transmit and take power measurements
+            # Transmit and take power measurements
             data = tx_measure(dev=TX, power_meter=PM, packet_count=5000)
             data = map(float, data)
             if(len(data) > 2):
@@ -213,21 +204,21 @@ def main(TX, RX, iterations, test_profile, power_controller):
             else:
                 print dec.decode_error_status(status)
 
+            # Get the PD out value
+            (status, pdout) = TX.get_pdout(9000, 32)
+            print "  pdout: 0x%X" % pdout
+
             time_now = strftime("%m/%d/%Y %H:%M:%S",localtime())
-            out_str = "%s, %s, %d, %d, 0x%X, %r" % (time_now, TX['mac'], ch, temp, gc, avg)
+            out_str = "%s, %s, %d, %d, 0x%X, %r, 0x%X" % (time_now, TX['mac'], ch, temp, gc, avg, pdout)
             print out_str
             f.write("%s\n" % out_str)
             f.flush()
 
-# Get the PD out value
-#        (status, pdout) = TX.get_pdout(9000, 32)
-#        print "  pdout: 0x%X" % pdout
-
-# Reenable power compensation
+    # Reenable power compensation
     (status, null) = TX.set_power_comp_enable(1)
 
 if __name__ == '__main__':
-# Set up logging to a file and the console
+    # Set up logging to a file and the console
     logging.basicConfig(
         level=logging.DEBUG,
         format="%(asctime)s [%(name)-8s] %(message)s",
@@ -239,5 +230,5 @@ if __name__ == '__main__':
     console.setFormatter(formatter)
     logging.getLogger('').addHandler(console)
 
-# Start the test
+    # Start the test
     main()
