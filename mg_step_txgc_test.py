@@ -71,11 +71,11 @@ class PMThread(threading.Thread):
 
 
 def tx_measure(dev, power_meter, packet_count):
-    sdev_thread = SummitDeviceThread(dev, packet_count)
+    rx_thread = SummitDeviceThread(dev, packet_count)
     pm_thread = PMThread(power_meter)
 
     pm_thread.start()
-    sdev_thread.start()
+    rx_thread.start()
     pm_thread.join()
     return pm_thread.measurements
 
@@ -85,7 +85,7 @@ def main(TX, RX, iterations, test_profile, power_controller):
     COM.connect()
     PM = E4418B(COM)
 
-### Beginning of Dave Schilling's new PM code ###
+    ### Beginning of Dave Schilling's new PM code ###
 
     # File operations to load in the power meter offset
     pm_offset_file = open('pm_offset.dat', 'r')
@@ -102,8 +102,11 @@ def main(TX, RX, iterations, test_profile, power_controller):
     print ("========================================================")
     print ("Power Meter ============================================")
 
+    print ("Resetting power meter...")
     PM.meter_reset()
+    print ("Clearing errors...")
     PM.clear_errors()
+    print ("Issuing SYST:PRES command...")
     PM.cmd("SYST:PRES")
     PM.cmd("SYST:REM")
 
@@ -138,7 +141,7 @@ def main(TX, RX, iterations, test_profile, power_controller):
     print ("========================================================")
     print ("")
 
-### End of Dave Schilling's new PM code ###
+    ### End of Dave Schilling's new PM code ###
 
     # Read the settings of the TX (Master) device
     TX.wr(0x406004, 0x00) # IRQ enable reg
@@ -169,50 +172,56 @@ def main(TX, RX, iterations, test_profile, power_controller):
                 0x4089B8,
                 0x4089BC]
 
-    filename = 'txpo_%s.txt' % (TX['mac'].replace(':','-'))
+    filename = 'steptxgc_%s.csv' % (TX['mac'].replace(':','-'))
 
-    # Ensure enabling power compensation
-    (status, null) = TX.set_power_comp_enable(1)
+    # Disable power compensation
+    (status, null) = TX.set_power_comp_enable(0)
 
     with open(filename, 'w') as f:
         out_str = "datetime, MAC, channel, temp, txgc, txpo, pdout"
         print out_str
         f.write("%s\n" % out_str)
 
-        for ch in range(8,35):
-            TX.set_radio_channel(0, ch)
-
-            # Get the temperature
-            (status, temp) = TX.temperature()
-
-            # Transmit and take power measurements
-            data = tx_measure(dev=TX, power_meter=PM, packet_count=5000)
-            data = map(float, data)
-            if(len(data) > 2):
-                avg = sum(data[1:-1])/float(len(data[1:-1]))
-            elif(len(data) > 1):
-                avg = float(data[0])
-            else:
-                avg = 0
-
-            (status, gc_index) = TX.rd(0x40100c)
-            if(status == 0x01):
-                gc_index = gc_index - 1
-                (status, gc) = TX.rd(gc_addrs[gc_index])
-                if(status != 0x01):
+        #txgcval = 0x28
+        for txgcval in range(0x20,0x30):
+            for ch in range(8,35):
+                TX.set_radio_channel(0, ch)
+    
+                # Get the temperature
+                (status, temp) = TX.temperature()
+    
+                # Set the TxGC registers with the fixed value
+                for regaddr in gc_addrs:
+                    TX.wr(regaddr, txgcval)
+    
+                # Transmit and take power measurements
+                data = tx_measure(dev=TX, power_meter=PM, packet_count=5000)
+                data = map(float, data)
+                if(len(data) > 2):
+                    avg = sum(data[1:-1])/float(len(data[1:-1]))
+                elif(len(data) > 1):
+                    avg = float(data[0])
+                else:
+                    avg = 0
+    
+                (status, gc_index) = TX.rd(0x40100c)
+                if(status == 0x01):
+                    gc_index = gc_index - 1
+                    (status, gc) = TX.rd(gc_addrs[gc_index])
+                    if(status != 0x01):
+                        print dec.decode_error_status(status)
+                else:
                     print dec.decode_error_status(status)
-            else:
-                print dec.decode_error_status(status)
+    
+                # Get the PD out value
+                (status, pdout) = TX.get_pdout(4000, 16)
+                #print "  pdout: 0x%X" % pdout
 
-            # Get the PD out value
-            (status, pdout) = TX.get_pdout(9000, 32)
-            #print "  pdout: 0x%X" % pdout
-
-            time_now = strftime("%m/%d/%Y %H:%M:%S",localtime())
-            out_str = "%s, %s, %d, %d, %d, %r, %d" % (time_now, TX['mac'], ch, temp, gc, avg, pdout)
-            print out_str
-            f.write("%s\n" % out_str)
-            f.flush()
+                time_now = strftime("%m/%d/%Y %H:%M:%S",localtime())
+                out_str = "%s, %s, %d, %d, %d, %r, %d" % (time_now, TX['mac'], ch, temp, gc, avg, pdout)
+                print out_str
+                f.write("%s\n" % out_str)
+                f.flush()
 
     # Reenable power compensation
     (status, null) = TX.set_power_comp_enable(1)
@@ -230,5 +239,5 @@ if __name__ == '__main__':
     console.setFormatter(formatter)
     logging.getLogger('').addHandler(console)
 
-    # Start the test
+# Start the test
     main()
