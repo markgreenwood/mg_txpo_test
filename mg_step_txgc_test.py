@@ -37,7 +37,7 @@ class SummitDeviceThread(threading.Thread):
             dev_running.set()
             (status, null) = self.dev.transmit_packets(self.packet_count)
             if(status != 0x01):
-                print dec.decode_error_status(status, 'transmit_packets')
+                print self.dev.decode_error_status(status, 'transmit_packets')
             dev_running.clear()
 
 class PMThread(threading.Thread):
@@ -150,17 +150,17 @@ def main(TX, RX, iterations, test_profile, power_controller):
 
     (status, CCAlevel) = TX.rd(0x408840)
     if(status != 0x01):
-        print dec.decode_error_status(status)
+        print TX.decode_error_status(status)
     print "  CCA Level regr 408840: 0x%X" % CCAlevel
 
     (status, IRQenables) = TX.rd(0x406004)
     if(status != 0x01):
-        print dec.decode_error_status(status)
+        print TX.decode_error_status(status)
     print "  IRQ Enable regr 406004: 0x%X" % IRQenables
 
     (status, DataRate) = TX.rd(0x401004)
     if(status != 0x01):
-        print dec.decode_error_status(status)
+        print TX.decode_error_status(status)
     print "  DataRate regr 401004: 0x%X" % DataRate
 
     gc_addrs = [0x4089A0,
@@ -183,7 +183,7 @@ def main(TX, RX, iterations, test_profile, power_controller):
         f.write("%s\n" % out_str)
 
         #txgcval = 0x28
-        for txgcval in range(0x20,0x30):
+        for txgcval in range(0x24,0x34):
             for ch in range(8,35):
                 TX.set_radio_channel(0, ch)
     
@@ -209,12 +209,12 @@ def main(TX, RX, iterations, test_profile, power_controller):
                     gc_index = gc_index - 1
                     (status, gc) = TX.rd(gc_addrs[gc_index])
                     if(status != 0x01):
-                        print dec.decode_error_status(status)
+                        print TX.decode_error_status(status)
                 else:
-                    print dec.decode_error_status(status)
+                    print TX.decode_error_status(status)
     
                 # Get the PD out value
-                (status, pdout) = TX.get_pdout(4000, 16)
+                (status, pdout) = TX.get_pdout(4000, 32)
                 #print "  pdout: 0x%X" % pdout
 
                 time_now = strftime("%m/%d/%Y %H:%M:%S",localtime())
