@@ -119,7 +119,7 @@ def main(TX, RX, iterations, test_profile, power_controller):
         PM.cmd("CORR:GAIN2 " + str(pm_offset))
 
     elif(pm_sensor == "E4412A" or pm_sensor == "E4413A"):
-        PM.cmd("CORR:DCYC " + str(duty_factor * 100) + "PCT", do_error_check=False)
+        PM.cmd("CORR:DCYC " + str(duty_factor * 100) + "PCT")
         PM.clear_errors()
         PM.cmd("CORR:GAIN2 " + str(pm_offset))
 
