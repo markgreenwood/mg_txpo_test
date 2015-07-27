@@ -7,14 +7,18 @@ from time import localtime, strftime
 import threading
 from pysummit import comport
 from pysummit import decoders as dec
+from pysummit import descriptors as desc
 from pysummit.devices import TxAPI
 from pysummit.devices import RxAPI
 import rfmeter
 from rfmeter.agilent import E4418B
 import logging
+import ctypes
 
 dev_running = threading.Event()
 pm_ready = threading.Event()
+
+FLASH_MAP_MFG_DATA_START_ADDR = 0xC0000
 
 class SummitDeviceThread(threading.Thread):
     """A thread for transmitting packets
@@ -80,6 +84,20 @@ def tx_measure(dev, power_meter, packet_count):
     return pm_thread.measurements
 
 def main(TX, RX, iterations, test_profile, power_controller):
+    # -------------------------------------------------------
+    # Main program flow
+    # -------------------------------------------------------
+    # Set up power meter (one-time)
+    # Set up Summit device (one-time)
+    for channel in range(8,35):
+        # Channel-dependent power meter setup
+        # Channel-dependent Summit device setup
+        # Get temp, power, txgc, and pdout; report values
+        pass
+    # -------------------------------------------------------
+    # End main program flow description
+    # -------------------------------------------------------
+
     # Instantiate a Power Meter and give it an open COM port
     COM = rfmeter.comport.ComPort('/dev/ttyUSB0')
     COM.connect()
@@ -119,7 +137,7 @@ def main(TX, RX, iterations, test_profile, power_controller):
         PM.cmd("CORR:GAIN2 " + str(pm_offset))
 
     elif(pm_sensor == "E4412A" or pm_sensor == "E4413A"):
-        PM.cmd("CORR:DCYC " + str(duty_factor * 100) + "PCT")
+        PM.cmd("CORR:DCYC " + str(duty_factor * 100) + "PCT", do_error_check=False)
         PM.clear_errors()
         PM.cmd("CORR:GAIN2 " + str(pm_offset))
 
@@ -173,6 +191,35 @@ def main(TX, RX, iterations, test_profile, power_controller):
 
     # Ensure enabling power compensation
     (status, null) = TX.set_power_comp_enable(1)
+
+    # Read MFG data from flash
+    tx_mfg_data = desc.FLASH_MASTER_MFG_DATA_SECTION()
+    status = TX.target.SWM_Diag_GetFlashData(
+        FLASH_MAP_MFG_DATA_START_ADDR,
+        ctypes.sizeof(desc.FLASH_MASTER_MFG_DATA_SECTION),
+        ctypes.byref(tx_mfg_data)
+        )
+
+    # Determine if module supports TPM (moduleID is Sherwood XD or Athena 4XD, firmware is 198.x or greater)
+    # and get default (cal) power level
+    modID = tx_mfg_data.masterMfgData.masterDescriptor.moduleDescriptor.moduleID
+    fwver = tx_mfg_data.masterMfgData.masterDescriptor.moduleDescriptor.firmwareVersion
+    defpwr = tx_mfg_data.radioCalData.defaultPwr
+
+    if ((modID == 0xFD) and ((fwver >> 5) >= 198)):
+            module_supports_tpm = True
+    else:
+            module_supports_tpm = False
+    print("\nmoduleID: 0x%X\nfirmwareVersion: %d.%d\nmodule_supports_tpm: %d\ndefaultPwr: %d" %
+            (modID, fwver >> 5, fwver & 0x1F, module_supports_tpm, defpwr))
+
+    # Disable DFS and TPM
+    if (module_supports_tpm):
+        (status, null) = TX.dfs_override(5)
+        (status, null) = TX.set_tpm_mode(0)
+        (status, null) = TX.set_transmit_power(defpwr)
+    else:
+        (status, null) = TX.dfs_override(1)
 
     with open(filename, 'w') as f:
         out_str = "datetime, MAC, channel, temp, txgc, txpo, pdout"
