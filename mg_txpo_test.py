@@ -88,35 +88,25 @@ def main(TX, RX, iterations, test_profile, power_controller):
     # Main program flow
     # -------------------------------------------------------
     # Set up power meter (one-time)
-    # Set up Summit device (one-time)
-    for channel in range(8,35):
-        # Channel-dependent power meter setup
-        # Channel-dependent Summit device setup
-        # Get temp, power, txgc, and pdout; report values
-        pass
     # -------------------------------------------------------
-    # End main program flow description
-    # -------------------------------------------------------
-
-    # Instantiate a Power Meter and give it an open COM port
+    # Instantiate PM
     COM = rfmeter.comport.ComPort('/dev/ttyUSB0')
     COM.connect()
     PM = E4418B(COM)
 
-### Beginning of Dave Schilling's new PM code ###
-
-    # File operations to load in the power meter offset
+    # Read offset file
     pm_offset_file = open('pm_offset.dat', 'r')
     pm_offset = float(pm_offset_file.read(6))
     pm_offset_file.close()
 
+    # Read duty factor
     # Uncomment the duty factor setting appropriate to your test
     #duty_factor = 0.23 # 36mbit
     duty_factor = 0.34 # 18mbit
     #duty_factor = 0.55 # 6mbit
     #duty_factor = 0.75 # ISOC
 
-    # Set up Power Meter as we like it
+    # Reset/initialize: clear errors, remote operation
     print ("========================================================")
     print ("Power Meter ============================================")
 
@@ -125,6 +115,7 @@ def main(TX, RX, iterations, test_profile, power_controller):
     PM.cmd("SYST:PRES")
     PM.cmd("SYST:REM")
 
+    # Check sensor type: load duty factor and offset (unless channel-specific)
     pm_sensor = PM.cmd("SERV:SENS1:TYPE?")
     print "Sensor identifies as:", pm_sensor
     #  "E4412A"=4412, "E4413A"=4413, "A"=HP8481A
@@ -156,13 +147,26 @@ def main(TX, RX, iterations, test_profile, power_controller):
     print ("========================================================")
     print ("")
 
-### End of Dave Schilling's new PM code ###
+    # -------------------------------------------------------
+    # Set up Summit device (one-time)
+    # -------------------------------------------------------
+    gc_addrs = [0x4089A0,
+                0x4089A4,
+                0x4089A8,
+                0x4089AC,
+                0x4089B0,
+                0x4089B4,
+                0x4089B8,
+                0x4089BC]
 
-    # Read the settings of the TX (Master) device
-    TX.wr(0x406004, 0x00) # IRQ enable reg
-    TX.wr(0x408840, 0x00) # CCA level reg
-    TX.wr(0x401004, 0x07) # 18Mb/s
+    filename = 'txpo_%s.txt' % (TX['mac'].replace(':','-'))
 
+    # Assume we're running a master device...
+    TX.wr(0x406004, 0x00) # IRQ enable reg - disable interrupts
+    TX.wr(0x408840, 0x00) # CCA level reg - set CCA level
+    TX.wr(0x401004, 0x07) # Set data rate to 18Mb/s
+
+    # Read and report the settings of the master device
     (status, CCAlevel) = TX.rd(0x408840)
     if(status != 0x01):
         print dec.decode_error_status(status)
@@ -177,17 +181,6 @@ def main(TX, RX, iterations, test_profile, power_controller):
     if(status != 0x01):
         print dec.decode_error_status(status)
     print "  DataRate regr 401004: 0x%X" % DataRate
-
-    gc_addrs = [0x4089A0,
-                0x4089A4,
-                0x4089A8,
-                0x4089AC,
-                0x4089B0,
-                0x4089B4,
-                0x4089B8,
-                0x4089BC]
-
-    filename = 'txpo_%s.txt' % (TX['mac'].replace(':','-'))
 
     # Ensure enabling power compensation
     (status, null) = TX.set_power_comp_enable(1)
@@ -227,8 +220,13 @@ def main(TX, RX, iterations, test_profile, power_controller):
         f.write("%s\n" % out_str)
 
         for ch in range(8,35):
+            # Channel-dependent power meter setup
+            # Not implemented yet...
+
+            # Channel-dependent Summit device setup
             TX.set_radio_channel(0, ch)
 
+            # Get temp, power, txgc, and pdout; report values
             # Get the temperature
             (status, temp) = TX.temperature()
 
@@ -242,6 +240,7 @@ def main(TX, RX, iterations, test_profile, power_controller):
             else:
                 avg = 0
 
+            # Get TXGC value
             (status, gc_index) = TX.rd(0x40100c)
             if(status == 0x01):
                 gc_index = gc_index - 1
@@ -251,7 +250,7 @@ def main(TX, RX, iterations, test_profile, power_controller):
             else:
                 print dec.decode_error_status(status)
 
-            # Get the PD out value
+            # Get the pdout value
             (status, pdout) = TX.get_pdout(9000, 32)
             #print "  pdout: 0x%X" % pdout
 
@@ -263,6 +262,9 @@ def main(TX, RX, iterations, test_profile, power_controller):
 
     # Reenable power compensation
     (status, null) = TX.set_power_comp_enable(1)
+    # -------------------------------------------------------
+    # End main program flow description
+    # -------------------------------------------------------
 
 if __name__ == '__main__':
     # Set up logging to a file and the console
