@@ -209,7 +209,7 @@ def main(TX, RX, iterations, test_profile, power_controller):
     # Disable DFS and TPM
     if (module_supports_tpm):
         (status, null) = TX.dfs_override(5)
-        (status, null) = TX.set_tpm_mode(0)
+        # (status, null) = TX.set_tpm_mode(0) # Don't do this - this is a user/customer command
         (status, null) = TX.set_transmit_power(defpwr)
     else:
         (status, null) = TX.dfs_override(1)
