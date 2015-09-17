@@ -15,10 +15,44 @@ from rfmeter.agilent import E4418B
 import logging
 import ctypes
 
+olympus_modules = (
+        0x06, # Glenwood
+        0x0F, # Sherwood XC
+        0xFD, # Sherwood XD
+        )
+
+apollo_modules = (
+        0x01, # Athena 4X
+        0x0C, # Athena 4XC
+        0x0D, # Athena UFL
+        0xCD, # Athena 4XD
+        )
+
+def getOlympusDutyFactor(fw_rev):
+    return (((fw_rev >> 5) < 199) and 0.34) or 0.45
+
+def getApolloDutyFactor(fw_rev):
+    return (((fw_rev >> 5) < 197) and 0.55) or 0.70
+
+def getSummitDutyFactor(module_id, fw_rev):
+    if module_id in olympus_modules: # Master/Olympus
+        return getOlympusDutyFactor(fw_rev)
+    elif module_id in apollo_modules: # Slave/Apollo
+        return getApolloDutyFactor(fw_rev)
+    else:
+        return 1.0
+
 dev_running = threading.Event()
 pm_ready = threading.Event()
 
 FLASH_MAP_MFG_DATA_START_ADDR = 0xC0000
+SHERWOOD_XD_MOD_ID = 0xFD
+SHERWOOD_XC_MOD_ID = 0x0F
+GLENWOOD_MOD_ID = 0x06
+ATHENA_UFL_MOD_ID = 0x0D
+ATHENA_4X_MOD_ID = 0x01
+ATHENA_4XC_MOD_ID = 0x0C
+ATHENA_4XD_MOD_ID = 0xCD
 
 class SummitDeviceThread(threading.Thread):
     """A thread for transmitting packets
@@ -102,9 +136,10 @@ def main(TX, RX, iterations, test_profile, power_controller):
     # Read duty factor
     # Uncomment the duty factor setting appropriate to your test
     #duty_factor = 0.23 # 36mbit
-    duty_factor = 0.34 # 18mbit
+    #duty_factor = 0.34 # 18mbit
     #duty_factor = 0.55 # 6mbit
     #duty_factor = 0.75 # ISOC
+    duty_factor = getSummitDutyFactor(0xFD, 198)
 
     # Reset/initialize: clear errors, remote operation
     print ("========================================================")
