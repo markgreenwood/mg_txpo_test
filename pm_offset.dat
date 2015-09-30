@@ -1,4 +1,5 @@
 +10.30
+#+0.70
 # The format is snn.ff in decibels
 # s=sign, n=integer, f=decimal fraction
 # Positive values yield a higher amplitude reading on the meter

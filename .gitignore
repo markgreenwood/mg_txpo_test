@@ -3,4 +3,5 @@ txpo*
 *.log
 *.txt
 cal_olympus_mjg.py
-
+cal_apollo_mjg.py
+apollo_tx_power_reading_withFile.py

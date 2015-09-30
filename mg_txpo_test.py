@@ -29,9 +29,11 @@ apollo_modules = (
         )
 
 def getOlympusDutyFactor(fw_rev):
+    # Duty factor for Olympus (@ 18 Mb/s) changed from 34% to 45% with FW199
     return (((fw_rev >> 5) < 199) and 0.34) or 0.45
 
 def getApolloDutyFactor(fw_rev):
+    # Duty factor for Apollo (@ 6 Mb/s) changed from 55% to 70% with FW197
     return (((fw_rev >> 5) < 197) and 0.55) or 0.70
 
 def getSummitDutyFactor(module_id, fw_rev):
@@ -40,7 +42,7 @@ def getSummitDutyFactor(module_id, fw_rev):
     elif module_id in apollo_modules: # Slave/Apollo
         return getApolloDutyFactor(fw_rev)
     else:
-        return 1.0
+        return 1.0 # if module type unknown, default to 100%
 
 dev_running = threading.Event()
 pm_ready = threading.Event()
@@ -121,6 +123,29 @@ def main(TX, RX, iterations, test_profile, power_controller):
     # -------------------------------------------------------
     # Main program flow
     # -------------------------------------------------------
+
+    # Read MFG data from flash
+    tx_mfg_data = desc.FLASH_MASTER_MFG_DATA_SECTION()
+    status = TX.target.SWM_Diag_GetFlashData(
+        FLASH_MAP_MFG_DATA_START_ADDR,
+        ctypes.sizeof(desc.FLASH_MASTER_MFG_DATA_SECTION),
+        ctypes.byref(tx_mfg_data)
+        )
+
+    # Determine if module supports TPM (moduleID is Sherwood XD or Athena 4XD, firmware is 198.x or greater)
+    # and get default (cal) power level
+    modID = tx_mfg_data.masterMfgData.masterDescriptor.moduleDescriptor.moduleID
+    fwver = tx_mfg_data.masterMfgData.masterDescriptor.moduleDescriptor.firmwareVersion
+    defpwr = tx_mfg_data.radioCalData.defaultPwr
+
+    if ((modID == 0xFD) and ((fwver >> 5) >= 198)):
+            module_supports_tpm = True
+    else:
+            module_supports_tpm = False
+    print("\nmoduleID: 0x%X\nfirmwareVersion: %d.%d\nmodule_supports_tpm: %d\ndefaultPwr: %d" %
+            (modID, fwver >> 5, fwver & 0x1F, module_supports_tpm, defpwr))
+
+    # -------------------------------------------------------
     # Set up power meter (one-time)
     # -------------------------------------------------------
     # Instantiate PM
@@ -133,13 +158,8 @@ def main(TX, RX, iterations, test_profile, power_controller):
     pm_offset = float(pm_offset_file.read(6))
     pm_offset_file.close()
 
-    # Read duty factor
-    # Uncomment the duty factor setting appropriate to your test
-    #duty_factor = 0.23 # 36mbit
-    #duty_factor = 0.34 # 18mbit
-    #duty_factor = 0.55 # 6mbit
-    #duty_factor = 0.75 # ISOC
-    duty_factor = getSummitDutyFactor(0xFD, 198)
+    # Get duty factor for power meter correction
+    duty_factor = getSummitDutyFactor(modID, fwver)
 
     # Reset/initialize: clear errors, remote operation
     print ("========================================================")
@@ -199,7 +219,10 @@ def main(TX, RX, iterations, test_profile, power_controller):
     # Assume we're running a master device...
     TX.wr(0x406004, 0x00) # IRQ enable reg - disable interrupts
     TX.wr(0x408840, 0x00) # CCA level reg - set CCA level
-    TX.wr(0x401004, 0x07) # Set data rate to 18Mb/s
+    if (module_id in olympus_modules):
+        TX.wr(0x401004, 0x07) # Set data rate to 18Mb/s
+    else:
+        TX.wr(0x401004, 0x0D) # Set data rate to 6Mb/s
 
     # Read and report the settings of the master device
     (status, CCAlevel) = TX.rd(0x408840)
@@ -219,27 +242,6 @@ def main(TX, RX, iterations, test_profile, power_controller):
 
     # Ensure enabling power compensation
     (status, null) = TX.set_power_comp_enable(1)
-
-    # Read MFG data from flash
-    tx_mfg_data = desc.FLASH_MASTER_MFG_DATA_SECTION()
-    status = TX.target.SWM_Diag_GetFlashData(
-        FLASH_MAP_MFG_DATA_START_ADDR,
-        ctypes.sizeof(desc.FLASH_MASTER_MFG_DATA_SECTION),
-        ctypes.byref(tx_mfg_data)
-        )
-
-    # Determine if module supports TPM (moduleID is Sherwood XD or Athena 4XD, firmware is 198.x or greater)
-    # and get default (cal) power level
-    modID = tx_mfg_data.masterMfgData.masterDescriptor.moduleDescriptor.moduleID
-    fwver = tx_mfg_data.masterMfgData.masterDescriptor.moduleDescriptor.firmwareVersion
-    defpwr = tx_mfg_data.radioCalData.defaultPwr
-
-    if ((modID == 0xFD) and ((fwver >> 5) >= 198)):
-            module_supports_tpm = True
-    else:
-            module_supports_tpm = False
-    print("\nmoduleID: 0x%X\nfirmwareVersion: %d.%d\nmodule_supports_tpm: %d\ndefaultPwr: %d" %
-            (modID, fwver >> 5, fwver & 0x1F, module_supports_tpm, defpwr))
 
     # Disable DFS and TPM
     if (module_supports_tpm):
