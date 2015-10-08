@@ -216,12 +216,13 @@ def main(TX, RX, iterations, test_profile, power_controller):
 
     filename = 'txpo_%s.txt' % (TX['mac'].replace(':','-'))
 
-    # Assume we're running a master device...
+    # Works for both masters and slaves...
     TX.wr(0x406004, 0x00) # IRQ enable reg - disable interrupts
     TX.wr(0x408840, 0x00) # CCA level reg - set CCA level
-    if (module_id in olympus_modules):
+
+    if (modID in olympus_modules): # Master
         TX.wr(0x401004, 0x07) # Set data rate to 18Mb/s
-    else:
+    else: #Slave
         TX.wr(0x401004, 0x0D) # Set data rate to 6Mb/s
 
     # Read and report the settings of the master device
@@ -246,9 +247,8 @@ def main(TX, RX, iterations, test_profile, power_controller):
     # Disable DFS and TPM
     if (module_supports_tpm):
         (status, null) = TX.dfs_override(5)
-        # (status, null) = TX.set_tpm_mode(0) # Don't do this - this is a user/customer command
         (status, null) = TX.set_transmit_power(defpwr)
-    else:
+    else: # no TPM, just disable DFS engine
         (status, null) = TX.dfs_override(1)
 
     with open(filename, 'w') as f:

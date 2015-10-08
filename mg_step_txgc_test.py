@@ -186,14 +186,14 @@ def main(TX, RX, iterations, test_profile, power_controller):
         for txgcval in range(0x24,0x34):
             for ch in range(8,35):
                 TX.set_radio_channel(0, ch)
-    
+
                 # Get the temperature
                 (status, temp) = TX.temperature()
-    
+
                 # Set the TxGC registers with the fixed value
                 for regaddr in gc_addrs:
                     TX.wr(regaddr, txgcval)
-    
+
                 # Transmit and take power measurements
                 data = tx_measure(dev=TX, power_meter=PM, packet_count=5000)
                 data = map(float, data)
@@ -203,16 +203,16 @@ def main(TX, RX, iterations, test_profile, power_controller):
                     avg = float(data[0])
                 else:
                     avg = 0
-    
+
                 (status, gc_index) = TX.rd(0x40100c)
                 if(status == 0x01):
-                    gc_index = gc_index - 1
+                    #gc_index = gc_index - 1 # Tom says this index is already zero-based 10/8/2015
                     (status, gc) = TX.rd(gc_addrs[gc_index])
                     if(status != 0x01):
                         print TX.decode_error_status(status)
                 else:
                     print TX.decode_error_status(status)
-    
+
                 # Get the PD out value
                 (status, pdout) = TX.get_pdout(4000, 32)
                 #print "  pdout: 0x%X" % pdout
