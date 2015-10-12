@@ -56,6 +56,9 @@ ATHENA_4X_MOD_ID = 0x01
 ATHENA_4XC_MOD_ID = 0x0C
 ATHENA_4XD_MOD_ID = 0xCD
 
+DUMP_PDOUT = True
+DUMP_TXGC_REGS = True
+
 class SummitDeviceThread(threading.Thread):
     """A thread for transmitting packets
 
@@ -252,9 +255,14 @@ def main(TX, RX, iterations, test_profile, power_controller):
         (status, null) = TX.dfs_override(1)
 
     with open(filename, 'w') as f:
-        out_str = "datetime, MAC, channel, temp, txgc, txpo, pdout"
-        print out_str
-        f.write("%s\n" % out_str)
+        headings = "datetime, MAC, channel, temp, txgc, txpo"
+        if (DUMP_PDOUT):
+            headings = headings + ", pdout"
+        if (DUMP_TXGC_REGS):
+            headings = headings + ", gc_index, gc0, gc1, gc2, gc3, gc4, gc5, gc6, gc7"
+
+        print headings
+        f.write("%s\n" % headings)
 
         for ch in range(8,35):
             # Channel-dependent power meter setup
@@ -280,19 +288,38 @@ def main(TX, RX, iterations, test_profile, power_controller):
             # Get TXGC value
             (status, gc_index) = TX.rd(0x40100c)
             if(status == 0x01):
-                gc_index = gc_index - 1
-                (status, gc) = TX.rd(gc_addrs[gc_index])
+                (status, txgc) = TX.rd(gc_addrs[gc_index])
                 if(status != 0x01):
                     print dec.decode_error_status(status)
             else:
                 print dec.decode_error_status(status)
 
+            # Get values from the TX_PWR registers if applicable
+            if (DUMP_TXGC_REGS):
+                gc_val = []
+                for reg_idx in range(8):
+                    (status, val) = TX.rd(gc_addrs[reg_idx])
+                    gc_val.append(val)
+
             # Get the pdout value
-            (status, pdout) = TX.get_pdout(9000, 32)
-            #print "  pdout: 0x%X" % pdout
+            if (DUMP_PDOUT):
+                (status, pdout) = TX.get_pdout(9000, 32)
+                #print "  pdout: 0x%X" % pdout
 
             time_now = strftime("%m/%d/%Y %H:%M:%S",localtime())
-            out_str = "%s, %s, %d, %d, %d, %r, %d" % (time_now, TX['mac'], ch, temp, gc, avg, pdout)
+
+            outputs = (time_now, TX['mac'], ch, temp, txgc, avg)
+            fmt_str = "%s, %s, %d, %d, %d, %r"
+
+            if (DUMP_PDOUT):
+                outputs = outputs + (pdout,)
+                fmt_str = fmt_str + ", %d"
+
+            if (DUMP_TXGC_REGS):
+                outputs = outputs + (gc_index,) + tuple(gc_val[0:8])
+                fmt_str = fmt_str + ", %d, %d, %d, %d, %d, %d, %d, %d, %d"
+
+            out_str = fmt_str % outputs
             print out_str
             f.write("%s\n" % out_str)
             f.flush()
