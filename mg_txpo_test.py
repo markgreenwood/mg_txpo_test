@@ -219,16 +219,16 @@ def main(TX, RX, iterations, test_profile, power_controller):
 
     filename = 'txpo_%s.txt' % (TX['mac'].replace(':','-'))
 
-    # Works for both masters and slaves...
+    # For both masters and slaves...
     TX.wr(0x406004, 0x00) # IRQ enable reg - disable interrupts
     TX.wr(0x408840, 0x00) # CCA level reg - set CCA level
 
-    if (modID in olympus_modules): # Master
+    if (modID in olympus_modules): # if it's a Master
         TX.wr(0x401004, 0x07) # Set data rate to 18Mb/s
-    else: #Slave
+    else: # it's a Slave
         TX.wr(0x401004, 0x0D) # Set data rate to 6Mb/s
 
-    # Read and report the settings of the master device
+    # Read and report the settings of the Summit device
     (status, CCAlevel) = TX.rd(0x408840)
     if(status != 0x01):
         print dec.decode_error_status(status)
