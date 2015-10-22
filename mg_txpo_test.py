@@ -15,18 +15,30 @@ from rfmeter.agilent import E4418B
 import logging
 import ctypes
 
+FLASH_MAP_MFG_DATA_START_ADDR = 0xC0000
+SHERWOOD_XD_MOD_ID = 0xFD
+SHERWOOD_XC_MOD_ID = 0x0F
+GLENWOOD_MOD_ID = 0x06
+ATHENA_UFL_MOD_ID = 0x0D
+ATHENA_4X_MOD_ID = 0x01
+ATHENA_4XC_MOD_ID = 0x0C
+ATHENA_4XD_MOD_ID = 0xCD
+
+DUMP_PDOUT = True
+DUMP_TXGC_REGS = True
+
 olympus_modules = (
-        0x06, # Glenwood
-        0x0F, # Sherwood XC
-        0xFD, # Sherwood XD
-        )
+    SHERWOOD_XD_MOD_ID,
+    SHERWOOD_XC_MOD_ID,
+    GLENWOOD_MOD_ID,
+    )
 
 apollo_modules = (
-        0x01, # Athena 4X
-        0x0C, # Athena 4XC
-        0x0D, # Athena UFL
-        0xCD, # Athena 4XD
-        )
+    ATHENA_UFL_MOD_ID,
+    ATHENA_4X_MOD_ID,
+    ATHENA_4XC_MOD_ID,
+    ATHENA_4XD_MOD_ID,
+    )
 
 def getOlympusDutyFactor(fw_rev):
     # Duty factor for Olympus (@ 18 Mb/s) changed from 34% to 45% with FW199
@@ -46,18 +58,6 @@ def getSummitDutyFactor(module_id, fw_rev):
 
 dev_running = threading.Event()
 pm_ready = threading.Event()
-
-FLASH_MAP_MFG_DATA_START_ADDR = 0xC0000
-SHERWOOD_XD_MOD_ID = 0xFD
-SHERWOOD_XC_MOD_ID = 0x0F
-GLENWOOD_MOD_ID = 0x06
-ATHENA_UFL_MOD_ID = 0x0D
-ATHENA_4X_MOD_ID = 0x01
-ATHENA_4XC_MOD_ID = 0x0C
-ATHENA_4XD_MOD_ID = 0xCD
-
-DUMP_PDOUT = True
-DUMP_TXGC_REGS = True
 
 class SummitDeviceThread(threading.Thread):
     """A thread for transmitting packets
