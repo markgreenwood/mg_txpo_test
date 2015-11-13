@@ -275,16 +275,6 @@ def main(TX, RX, iterations, test_profile, power_controller):
             # Get the temperature
             (status, temp) = TX.temperature()
 
-            # Transmit and take power measurements
-            data = tx_measure(dev=TX, power_meter=PM, packet_count=5000)
-            data = map(float, data)
-            if(len(data) > 2):
-                avg = sum(data[1:-1])/float(len(data[1:-1]))
-            elif(len(data) > 1):
-                avg = float(data[0])
-            else:
-                avg = 0
-
             # Get TXGC value
             (status, gc_index) = TX.rd(0x40100c)
             if(status == 0x01):
@@ -300,6 +290,16 @@ def main(TX, RX, iterations, test_profile, power_controller):
                 for reg_idx in range(8):
                     (status, val) = TX.rd(gc_addrs[reg_idx])
                     gc_val.append(val)
+
+            # Transmit and take power measurements
+            data = tx_measure(dev=TX, power_meter=PM, packet_count=5000)
+            data = map(float, data)
+            if(len(data) > 2):
+                avg = sum(data[1:-1])/float(len(data[1:-1]))
+            elif(len(data) > 1):
+                avg = float(data[0])
+            else:
+                avg = 0
 
             # Get the pdout value
             if (DUMP_PDOUT):
