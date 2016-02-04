@@ -24,8 +24,9 @@ ATHENA_4X_MOD_ID = 0x01
 ATHENA_4XC_MOD_ID = 0x0C
 ATHENA_4XD_MOD_ID = 0xCD
 
-DUMP_PDOUT = True
+DUMP_PDOUT = False
 DUMP_TXGC_REGS = True
+TIMING_INFO = True
 
 olympus_modules = (
     SHERWOOD_XD_MOD_ID,
@@ -106,6 +107,8 @@ class PMThread(threading.Thread):
         while(dev_running.is_set()):
             meas = self.pm.cmd("MEAS?", timeout=15)
             self.logger.info("%d: %s" % (total_runs, meas))
+            if (TIMING_INFO):
+                print("%s - %s dBm" % (strftime("%m/%d/%Y %H:%M:%S",localtime()), meas))
             self.measurements.append(meas)
             total_runs += 1
 
@@ -195,6 +198,7 @@ def main(TX, RX, iterations, test_profile, power_controller):
         PM.cmd("CORR:GAIN2 " + str(pm_offset))
 
     PM.cmd("FREQ " + "5.500GHZ")
+    PM.cmd("SENS:AVER:COUN 1")
 
     print ("========================================================")
     print (" Duty Factor = " + str(duty_factor * 100) + "%")
@@ -218,6 +222,9 @@ def main(TX, RX, iterations, test_profile, power_controller):
                 0x4089BC]
 
     filename = 'txpo_%s.txt' % (TX['mac'].replace(':','-'))
+
+    if (TIMING_INFO):
+        print("Initiating comm with the Summit module at %s" % strftime("%m/%d/%Y %H:%M:%S",localtime()))
 
     # For both masters and slaves...
     TX.wr(0x406004, 0x00) # IRQ enable reg - disable interrupts
@@ -292,7 +299,12 @@ def main(TX, RX, iterations, test_profile, power_controller):
                     gc_val.append(val)
 
             # Transmit and take power measurements
+
+            if (TIMING_INFO):
+                print("Starting tx_measure at %s" % strftime("%m/%d/%Y %H:%M:%S",localtime()))
             data = tx_measure(dev=TX, power_meter=PM, packet_count=5000)
+            if (TIMING_INFO):
+                print("Finished tx_measure at %s" % strftime("%m/%d/%Y %H:%M:%S",localtime()))
             data = map(float, data)
             if(len(data) > 2):
                 avg = sum(data[1:-1])/float(len(data[1:-1]))
@@ -307,6 +319,9 @@ def main(TX, RX, iterations, test_profile, power_controller):
                 #print "  pdout: 0x%X" % pdout
 
             time_now = strftime("%m/%d/%Y %H:%M:%S",localtime())
+
+            # Let the part cool down?
+            #time.sleep(5)
 
             outputs = (time_now, TX['mac'], ch, temp, txgc, avg)
             fmt_str = "%s, %s, %d, %d, %d, %r"
@@ -333,7 +348,7 @@ def main(TX, RX, iterations, test_profile, power_controller):
 if __name__ == '__main__':
     # Set up logging to a file and the console
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format="%(asctime)s [%(name)-8s] %(message)s",
         filename="power_reading.log",
         filemode="w")
