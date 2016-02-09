@@ -26,7 +26,7 @@ ATHENA_4XD_MOD_ID = 0xCD
 
 DUMP_PDOUT = False
 DUMP_TXGC_REGS = True
-TIMING_INFO = True
+TIMING_INFO = False
 
 olympus_modules = (
     SHERWOOD_XD_MOD_ID,
