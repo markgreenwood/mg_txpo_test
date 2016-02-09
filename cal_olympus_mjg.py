@@ -3,15 +3,18 @@
 
 import math
 import time
+from time import localtime, strftime
 import threading
 import Queue
 from pysummit import comport
 from pysummit import decoders as dec
+from pysummit import descriptors as desc
 from pysummit.devices import TxAPI
 from pysummit.devices import RxAPI
 import rfmeter
 from rfmeter.agilent import E4418B
 import logging
+import ctypes
 
 FLASH_MAP_MFG_DATA_START_ADDR = 0xC0000
 SHERWOOD_XD_MOD_ID = 0xFD
