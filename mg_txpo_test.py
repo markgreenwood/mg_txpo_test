@@ -164,6 +164,7 @@ def main(TX, RX, iterations, test_profile, power_controller):
 
     PM.cmd("FREQ " + "5.500GHZ")
     PM.cmd("SENS:AVER:COUN 1")
+    PM.cmd("SENS:POW:AC:RANGE 1")
 
     print ("========================================================")
     print (" Duty Factor = " + str(duty_factor * 100) + "%")
@@ -195,7 +196,7 @@ def main(TX, RX, iterations, test_profile, power_controller):
     TX.wr(0x406004, 0x00) # IRQ enable reg - disable interrupts
     TX.wr(0x408840, 0x00) # CCA level reg - set CCA level
 
-    if (modID in olympus_modules): # if it's a Master
+    if (modID in sdf.olympus_modules): # if it's a Master
         TX.wr(0x401004, 0x07) # Set data rate to 18Mb/s
     else: # it's a Slave
         TX.wr(0x401004, 0x0D) # Set data rate to 6Mb/s
