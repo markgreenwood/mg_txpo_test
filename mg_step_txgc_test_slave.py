@@ -12,6 +12,7 @@ from pysummit.devices import RxAPI
 import rfmeter
 from rfmeter.agilent import E4418B
 import logging
+from pysummit import swm_dutyfactor as sdf
 
 dev_running = threading.Event()
 pm_ready = threading.Event()
@@ -71,11 +72,11 @@ class PMThread(threading.Thread):
 
 
 def tx_measure(dev, power_meter, packet_count):
-    rx_thread = SummitDeviceThread(dev, packet_count)
+    sdev_thread = SummitDeviceThread(dev, packet_count)
     pm_thread = PMThread(power_meter)
 
     pm_thread.start()
-    rx_thread.start()
+    sdev_thread.start()
     pm_thread.join()
     return pm_thread.measurements
 
@@ -94,9 +95,10 @@ def main(TX, RX, iterations, test_profile, power_controller):
 
     # Uncomment the duty factor setting appropriate to your test
     #duty_factor = 0.23 # 36mbit
-    duty_factor = 0.34 # 18mbit
+    #duty_factor = 0.34 # 18mbit
     #duty_factor = 0.55 # 6mbit
     #duty_factor = 0.75 # ISOC
+    duty_factor = sdf.getSummitDutyFactor(0xCD, 0x1901)
 
     # Set up Power Meter as we like it
     print ("========================================================")
@@ -144,23 +146,24 @@ def main(TX, RX, iterations, test_profile, power_controller):
     ### End of Dave Schilling's new PM code ###
 
     # Read the settings of the TX (Master) device
-    TX.wr(0x406004, 0x00) # IRQ enable reg
-    TX.wr(0x408840, 0x00) # CCA level reg
-    TX.wr(0x401004, 0x07) # 18Mb/s
+    RX[0].wr(0x401018, 0x13) # Sets antenna to A1
+    RX[0].wr(0x401004, 0x0d)    # Sets to 6Mbits
+    RX[0].wr(0x406004, 0x00) # IRQ enable reg
+    RX[0].wr(0x408840, 0x00) # CCA level reg
 
-    (status, CCAlevel) = TX.rd(0x408840)
+    (status, CCAlevel) = RX[0].rd(0x408840)
     if(status != 0x01):
-        print TX.decode_error_status(status)
+        print RX[0].decode_error_status(status)
     print "  CCA Level regr 408840: 0x%X" % CCAlevel
 
-    (status, IRQenables) = TX.rd(0x406004)
+    (status, IRQenables) = RX[0].rd(0x406004)
     if(status != 0x01):
-        print TX.decode_error_status(status)
+        print RX[0].decode_error_status(status)
     print "  IRQ Enable regr 406004: 0x%X" % IRQenables
 
-    (status, DataRate) = TX.rd(0x401004)
+    (status, DataRate) = RX[0].rd(0x401004)
     if(status != 0x01):
-        print TX.decode_error_status(status)
+        print RX[0].decode_error_status(status)
     print "  DataRate regr 401004: 0x%X" % DataRate
 
     gc_addrs = [0x4089A0,
@@ -172,30 +175,31 @@ def main(TX, RX, iterations, test_profile, power_controller):
                 0x4089B8,
                 0x4089BC]
 
-    filename = 'steptxgc_%s.csv' % (TX['mac'].replace(':','-'))
+    filename = 'steptxgc_%s.csv' % (RX[0]['mac'].replace(':','-'))
 
     # Disable power compensation
-    (status, null) = TX.set_power_comp_enable(0)
+    (status, null) = RX[0].set_power_comp_enable(0)
 
     with open(filename, 'w') as f:
-        out_str = "datetime, MAC, channel, temp, txgc, txpo, pdout"
+        #out_str = "datetime, MAC, channel, temp, txgc, txpo, pdout"
+        out_str = "datetime, MAC, channel, temp, txgc, txpo"
         print out_str
         f.write("%s\n" % out_str)
 
         #txgcval = 0x28
-        for txgcval in [0x25,0x30,0x35]:
+        for txgcval in [20,25,30,35,40]:
             for ch in range(8,35):
-                TX.set_radio_channel(0, ch)
+                RX[0].set_radio_channel(0, ch)
 
                 # Get the temperature
-                (status, temp) = TX.temperature()
+                (status, temp) = RX[0].temperature()
 
                 # Set the TxGC registers with the fixed value
                 for regaddr in gc_addrs:
-                    TX.wr(regaddr, txgcval)
+                    RX[0].wr(regaddr, txgcval)
 
                 # Transmit and take power measurements
-                data = tx_measure(dev=TX, power_meter=PM, packet_count=5000)
+                data = tx_measure(dev=RX[0], power_meter=PM, packet_count=5000)
                 data = map(float, data)
                 if(len(data) > 2):
                     avg = sum(data[1:-1])/float(len(data[1:-1]))
@@ -204,27 +208,28 @@ def main(TX, RX, iterations, test_profile, power_controller):
                 else:
                     avg = 0
 
-                (status, gc_index) = TX.rd(0x40100c)
+                (status, gc_index) = RX[0].rd(0x40100c)
                 if(status == 0x01):
                     #gc_index = gc_index - 1 # Tom says this index is already zero-based 10/8/2015
-                    (status, gc) = TX.rd(gc_addrs[gc_index])
+                    (status, gc) = RX[0].rd(gc_addrs[gc_index])
                     if(status != 0x01):
-                        print TX.decode_error_status(status)
+                        print RX[0].decode_error_status(status)
                 else:
-                    print TX.decode_error_status(status)
+                    print RX[0].decode_error_status(status)
 
                 # Get the PD out value
-                (status, pdout) = TX.get_pdout(4000, 32)
+                #(status, pdout) = RX[0].get_pdout(4000, 32)
                 #print "  pdout: 0x%X" % pdout
 
                 time_now = strftime("%m/%d/%Y %H:%M:%S",localtime())
-                out_str = "%s, %s, %d, %d, %d, %r, %d" % (time_now, TX['mac'], ch, temp, gc, avg, pdout)
+                #out_str = "%s, %s, %d, %d, %d, %r, %d" % (time_now, RX[0]['mac'], ch, temp, gc, avg, pdout)
+                out_str = "%s, %s, %d, %d, %d, %r" % (time_now, RX[0]['mac'], ch, temp, gc, avg)
                 print out_str
                 f.write("%s\n" % out_str)
                 f.flush()
 
     # Reenable power compensation
-    (status, null) = TX.set_power_comp_enable(1)
+    (status, null) = RX[0].set_power_comp_enable(1)
 
 if __name__ == '__main__':
     # Set up logging to a file and the console
