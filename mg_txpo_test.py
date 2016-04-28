@@ -20,6 +20,12 @@ from pysummit.bsp.pi_bsp import PiBSP
 
 FLASH_MAP_MFG_DATA_START_ADDR = 0xC0000
 
+IRQ_EN_REG = 0x406004
+BASEBAND_CCA_CTL_REG = 0x408840
+TXVECTOR_RATE_REG = 0x401004
+TXVECTOR_POWER_REG = 0x40100C
+RF_PWR_CNTL_REG = 0x401018
+
 DUMP_PDOUT = False
 DUMP_TXGC_REGS = True
 TIMING_INFO = False
@@ -198,26 +204,26 @@ def main(TX, RX, tp=None, pc=None, args=[]):
         print("Initiating comm with the Summit module at %s" % strftime("%m/%d/%Y %H:%M:%S",localtime()))
 
     # For both masters and slaves...
-    TX.wr(0x406004, 0x00) # IRQ enable reg - disable interrupts
-    TX.wr(0x408840, 0x00) # CCA level reg - set CCA level
+    TX.wr(IRQ_EN_REG, 0x00) # IRQ enable reg - disable interrupts
+    TX.wr(BASEBAND_CCA_CTL_REG, 0x00) # CCA level reg - set CCA level
 
     if (modID in sdf.olympus_modules): # if it's a Master
-        TX.wr(0x401004, 0x07) # Set data rate to 18Mb/s
+        TX.wr(TXVECTOR_RATE_REG, 0x07) # Set data rate to 18Mb/s
     else: # it's a Slave
-        TX.wr(0x401004, 0x0D) # Set data rate to 6Mb/s
+        TX.wr(TXVECTOR_RATE_REG, 0x0D) # Set data rate to 6Mb/s
 
     # Read and report the settings of the Summit device
-    (status, CCAlevel) = TX.rd(0x408840)
+    (status, CCAlevel) = TX.rd(BASEBAND_CCA_CTL_REG)
     if(status != 0x01):
         print dec.decode_error_status(status)
     print "  CCA Level regr 408840: 0x%X" % CCAlevel
 
-    (status, IRQenables) = TX.rd(0x406004)
+    (status, IRQenables) = TX.rd(IRQ_EN_REG)
     if(status != 0x01):
         print dec.decode_error_status(status)
     print "  IRQ Enable regr 406004: 0x%X" % IRQenables
 
-    (status, DataRate) = TX.rd(0x401004)
+    (status, DataRate) = TX.rd(TXVECTOR_RATE_REG)
     if(status != 0x01):
         print dec.decode_error_status(status)
     print "  DataRate regr 401004: 0x%X" % DataRate
@@ -254,7 +260,7 @@ def main(TX, RX, tp=None, pc=None, args=[]):
             (status, temp) = TX.temperature()
 
             # Get TXGC value
-            (status, gc_index) = TX.rd(0x40100c)
+            (status, gc_index) = TX.rd(TXVECTOR_POWER_REG)
             if(status == 0x01):
                 (status, txgc) = TX.rd(gc_addrs[gc_index])
                 if(status != 0x01):
