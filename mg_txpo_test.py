@@ -46,8 +46,6 @@ class SummitDeviceThread(threading.Thread):
         self.dev = dev
         self.packet_count = packet_count
         self.logger = logging.getLogger('SummitDeviceThread')
-        #self.logger.setLevel(logging.DEBUG)
-        #self.logger.addHandler(logging.FileHandler('summitdevthread.log'))
 
     def run(self):
         self.logger.info("Transmitting %d packets" % self.packet_count)
@@ -71,8 +69,6 @@ class PMThread(threading.Thread):
         self.daemon = True
         self.pm = pm
         self.logger = logging.getLogger('PMThread')
-        #self.logger.setLevel(logging.DEBUG)
-        #self.logger.addHandler(logging.FileHandler('pmthread.log'))
         self.measurements = []
 
     def run(self):
@@ -84,7 +80,6 @@ class PMThread(threading.Thread):
         while(dev_running.is_set()):
             meas = self.pm.cmd("MEAS?", timeout=15)
             self.logger.info("%d: %s" % (total_runs, meas))
-            self.logger.info("%s - %s dBm" % (strftime("%m/%d/%Y %H:%M:%S",localtime()), meas))
             self.measurements.append(meas)
             total_runs += 1
 
@@ -323,20 +318,9 @@ def main(TX, RX, tp=None, pc=None, args=[]):
     # -------------------------------------------------------
 
 if __name__ == '__main__':
+
+    # Set up logging according to logging.conf
     logging.config.fileConfig('logging.conf')
-    # Set up logging to a file and the console
-#    logging.basicConfig(
-#        level=logging.INFO,
-#        format="%(asctime)s [%(name)-8s] %(message)s",
-#        filename="power_reading.log",
-#        filemode="w")
-#    console = logging.StreamHandler()
-#    console.setLevel(logging.DEBUG)
-#    formatter = logging.Formatter("%(name)-8s: %(levelname)-8s %(message)s")
-#    console.setFormatter(formatter)
-#    logging.getLogger('').addHandler(console)
-#    logging.getLogger('PMThread').addHandler(console)
-#    logging.getLogger('SummitDeviceThread').addHandler(console)
 
     # Set up devices
     pi_bsp = PiBSP()
