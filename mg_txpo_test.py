@@ -18,6 +18,7 @@ import ctypes
 from pysummit import swm_dutyfactor as sdf
 from pysummit.bsp.pi_bsp import PiBSP
 
+# Useful aliases for cryptic stuff (register addresses, etc.)
 FLASH_MAP_MFG_DATA_START_ADDR = 0xC0000
 
 IRQ_EN_REG = 0x406004
@@ -26,6 +27,7 @@ TXVECTOR_RATE_REG = 0x401004
 TXVECTOR_POWER_REG = 0x40100C
 RF_PWR_CNTL_REG = 0x401018
 
+# Flags to toggle features on and off
 DUMP_PDOUT = False
 DUMP_TXGC_REGS = True
 TIMING_INFO = False
@@ -78,7 +80,11 @@ class PMThread(threading.Thread):
         while(not dev_running.is_set()):
             pass
         while(dev_running.is_set()):
-            meas = self.pm.cmd("MEAS?", timeout=15)
+            # Using the FETCH? command is faster but may be less accurate;
+            # using MEAS? auto-ranges/averages and prevents disabling those.
+            # M. Greenwood (4/29/2016)
+            meas = self.pm.cmd("FETCH?", timeout=15)
+            #meas = self.pm.cmd("MEAS?", timeout=15)
             self.logger.info("%d: %s" % (total_runs, meas))
             self.measurements.append(meas)
             total_runs += 1
@@ -169,6 +175,7 @@ def main(TX, RX, tp=None, pc=None, args=[]):
         PM.cmd("CORR:GAIN2 " + str(pm_offset))
 
     PM.cmd("FREQ " + "5.500GHZ")
+    PM.cmd("SENS:AVER:COUN:AUTO OFF")
     PM.cmd("SENS:AVER:COUN 1")
     PM.cmd("SENS:POW:AC:RANGE 1")
 
