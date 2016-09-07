@@ -187,7 +187,7 @@ def main(TX, RX, iterations, test_profile, power_controller):
                 0x4089B8,
                 0x4089BC]
 
-    filename = 'txpo_%s.txt' % (TX['mac'].replace(':','-'))
+    filename = 'txpo_%s.txt' % (RX[0]['mac'].replace(':','-'))
 
     if (TIMING_INFO):
         print("Initiating comm with the Summit module at %s" % strftime("%m/%d/%Y %H:%M:%S",localtime()))
@@ -221,7 +221,8 @@ def main(TX, RX, iterations, test_profile, power_controller):
     (status, null) = RX[0].set_power_comp_enable(1)
 
     # Disable DFS and TPM
-    if (module_supports_tpm):
+
+    if module_supports_tpm:
         (status, null) = RX[0].dfs_override(5)
         (status, null) = RX[0].set_transmit_power(defpwr)
     else: # no TPM, just disable DFS engine

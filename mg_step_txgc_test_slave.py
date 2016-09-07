@@ -187,8 +187,9 @@ def main(TX, RX, iterations, test_profile, power_controller):
         f.write("%s\n" % out_str)
 
         #txgcval = 0x28
-        for txgcval in [20,25,30,35,40]:
-            for ch in range(8,35):
+        for txgcval in [9,56]:
+            #for ch in range(8,35):
+            for ch in [8, 18, 19, 23, 24, 29, 30, 34]:
                 RX[0].set_radio_channel(0, ch)
 
                 # Get the temperature

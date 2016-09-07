@@ -28,12 +28,17 @@ TXVECTOR_POWER_REG = 0x40100C
 RF_PWR_CNTL_REG = 0x401018
 
 # Flags to toggle features on and off
-DUMP_PDOUT = False
+DUMP_PDOUT = True
 DUMP_TXGC_REGS = True
 TIMING_INFO = False
 
 dev_running = threading.Event()
 pm_ready = threading.Event()
+
+# You need two threads, one for the power meter to collect readings, and the
+# other for the Summit device to transmit packets. Because the Summit API
+# call to transmit packets is a blocking call (doesn't return until finished)
+# you need simultaneous threads to do this.
 
 class SummitDeviceThread(threading.Thread):
     """A thread for transmitting packets
