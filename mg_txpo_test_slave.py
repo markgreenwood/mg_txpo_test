@@ -96,25 +96,25 @@ def main(TX, RX, iterations, test_profile, power_controller):
     # -------------------------------------------------------
 
     # Read MFG data from flash
-    tx_mfg_data = desc.FLASH_MASTER_MFG_DATA_SECTION()
+    rx_mfg_data = desc.DATAFLASH_SPEAKER_MFG_DATA_SECTION()
     status = RX[0].target.SWM_Diag_GetFlashData(
         FLASH_MAP_MFG_DATA_START_ADDR,
-        ctypes.sizeof(desc.FLASH_MASTER_MFG_DATA_SECTION),
-        ctypes.byref(tx_mfg_data)
+        ctypes.sizeof(desc.DATAFLASH_SPEAKER_MFG_DATA_SECTION),
+        ctypes.byref(rx_mfg_data)
         )
 
     # Determine if module supports TPM (moduleID is Sherwood XD or Athena 4XD, firmware is 198.x or greater)
     # and get default (cal) power level
-    modID = tx_mfg_data.masterMfgData.masterDescriptor.moduleDescriptor.moduleID
-    fwver = tx_mfg_data.masterMfgData.masterDescriptor.moduleDescriptor.firmwareVersion
-    defpwr = tx_mfg_data.radioCalData.defaultPwr
+    modID = rx_mfg_data.speakerMfgData.moduleDescriptor.moduleID
+    fwver = rx_mfg_data.speakerMfgData.moduleDescriptor.firmwareVersion
+    #defpwr = rx_mfg_data.radioCalData.defaultPwr
 
     if ((modID == 0xFD) and ((fwver >> 5) >= 198)):
             module_supports_tpm = True
     else:
             module_supports_tpm = False
-    print("\nmoduleID: 0x%X\nfirmwareVersion: %d.%d\nmodule_supports_tpm: %d\ndefaultPwr: %d" %
-            (modID, fwver >> 5, fwver & 0x1F, module_supports_tpm, defpwr))
+    print("\nmoduleID: 0x%X\nfirmwareVersion: %d.%d\nmodule_supports_tpm: %d" %
+            (modID, fwver >> 5, fwver & 0x1F, module_supports_tpm))
 
     # -------------------------------------------------------
     # Set up power meter (one-time)
@@ -221,12 +221,12 @@ def main(TX, RX, iterations, test_profile, power_controller):
     (status, null) = RX[0].set_power_comp_enable(1)
 
     # Disable DFS and TPM
-
-    if module_supports_tpm:
-        (status, null) = RX[0].dfs_override(5)
-        (status, null) = RX[0].set_transmit_power(defpwr)
-    else: # no TPM, just disable DFS engine
-        (status, null) = RX[0].dfs_override(1)
+    # NOT for slaves
+#    if module_supports_tpm:
+#        (status, null) = RX[0].dfs_override(5)
+#        (status, null) = RX[0].set_transmit_power(defpwr)
+#    else: # no TPM, just disable DFS engine
+#        (status, null) = RX[0].dfs_override(1)
 
     with open(filename, 'w') as f:
         headings = "datetime, MAC, channel, temp, txgc, txpo"
@@ -269,7 +269,7 @@ def main(TX, RX, iterations, test_profile, power_controller):
 
             if (TIMING_INFO):
                 print("Starting tx_measure at %s" % strftime("%m/%d/%Y %H:%M:%S",localtime()))
-            data = tx_measure(dev=TX, power_meter=PM, packet_count=5000)
+            data = tx_measure(dev=RX, power_meter=PM, packet_count=5000)
             if (TIMING_INFO):
                 print("Finished tx_measure at %s" % strftime("%m/%d/%Y %H:%M:%S",localtime()))
             data = map(float, data)
@@ -290,7 +290,7 @@ def main(TX, RX, iterations, test_profile, power_controller):
             # Let the part cool down?
             #time.sleep(5)
 
-            outputs = (time_now, TX['mac'], ch, temp, txgc, avg)
+            outputs = (time_now, RX[0]['mac'], ch, temp, txgc, avg)
             fmt_str = "%s, %s, %d, %d, %d, %r"
 
             if (DUMP_PDOUT):
